@@ -24,6 +24,8 @@
 
 #include "a314.h"
 
+#define ALL_1MB_CHIP_ON_A314	1
+
 void NewList(struct List *l)
 {
 	l->lh_Head = (struct Node *)&(l->lh_Tail);
@@ -146,6 +148,14 @@ BOOL fix_memory()
 	{
 		Permit();
 		return FALSE;
+	}
+
+	if (ALL_1MB_CHIP_ON_A314)
+	{
+		chip_mh->mh_Attributes |= MEMF_A314;
+		a314_membase = 0;
+		Permit();
+		return TRUE;
 	}
 
 	if ((ULONG)(chip_mh->mh_Upper) > 0x100000)
