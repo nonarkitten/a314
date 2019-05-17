@@ -352,7 +352,7 @@ static void spi_write_cmem(unsigned int address, unsigned int data)
 {
     logger_trace("SPI write cmem, address = %d, data = %d\n", address, data);
 
-    tx_buf[0] = (uint8_t)((WRITE_CMEM_CMD << 4) | (address & 0xf);
+    tx_buf[0] = (uint8_t)((WRITE_CMEM_CMD << 4) | (address & 0xf));
     tx_buf[1] = (uint8_t)(data & 0xf);
     transfer(2);
 }
