@@ -104,7 +104,7 @@ module a314_top(
 
         //.DR_XMEM(DR_XMEM),
         .DR_WE_n(DR_WE_n),
-        .DR_RAS0_n(DR_RAS0_n),
+        .DR_RAS0_n(1'b1), // DR_RAS0_n(DR_RAS0_n) for rev 8 (A500+)
         .DR_RAS1_n(DR_RAS1_n),
         .DR_CASL_n(DR_CASL_n),
         .DR_CASU_n(DR_CASU_n),
