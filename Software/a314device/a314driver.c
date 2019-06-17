@@ -72,7 +72,13 @@ struct ExecBase *SysBase;
 
 
 
-ULONG a314_membase = 0;
+#define MAPPING_512K_UPPER		1
+#define MAPPING_1M_CONTINUOUS	2
+
+short mapping_type = 0;
+ULONG mapping_base = 0;
+
+ULONG translate_address_a314(__reg("a6") struct MyDevice *dev, __reg("a0") void *address);
 
 struct MemChunkList
 {
@@ -110,7 +116,8 @@ BOOL fix_memory()
 		if (mh->mh_Attributes & MEMF_A314)
 		{
 			ULONG lower = (ULONG)(mh->mh_Lower) & ~(512*1024 - 1);
-			a314_membase = lower == 0x100000 ? 0x100000 : lower - 0x80000;
+			mapping_type = lower == 0x100000 ? MAPPING_1M_CONTINUOUS : MAPPING_512K_UPPER;
+			mapping_base = lower;
 			Permit();
 			return TRUE;
 		}
@@ -125,7 +132,8 @@ BOOL fix_memory()
 			mh->mh_Node.ln_Pri = -20;
 			mh->mh_Attributes |= MEMF_A314;
 			AddTail(memlist, (struct Node*)mh);
-			a314_membase = 0xc00000 - 0x80000;
+			mapping_type = MAPPING_512K_UPPER;
+			mapping_base = 0xc00000;
 			Permit();
 			return TRUE;
 		}
@@ -149,7 +157,7 @@ BOOL fix_memory()
 		return FALSE;
 	}
 
-	// Split chip memory region into normal and A314 memory regions.
+	// Split chip memory region into motherboard and A314 memory regions.
 	ULONG split_at = (ULONG)(chip_mh->mh_Upper) > 0x100000 ? 0x100000 : 0x80000;
 
 	mh = (struct MemHeader *)AllocMem(sizeof(struct MemHeader), MEMF_PUBLIC | MEMF_CLEAR);
@@ -201,7 +209,8 @@ BOOL fix_memory()
 
 	AddTail(memlist, (struct Node*)mh);
 
-	a314_membase = split_at == 0x100000 ? 0x100000 : 0;
+	mapping_type = split_at == 0x100000 ? MAPPING_1M_CONTINUOUS : MAPPING_512K_UPPER;
+	mapping_base = split_at;
 
 	Permit();
 	return TRUE;
@@ -294,7 +303,7 @@ UBYTE read_cp_nibble(int index)
 
 void write_base_address(void *p)
 {
-	ULONG ba = (ULONG)p - a314_membase;
+	ULONG ba = translate_address_a314(NULL, p);
 	ba |= 1;
 
 	Disable();
@@ -1296,9 +1305,24 @@ ULONG abort_io(__reg("a6") struct MyDevice *dev, __reg("a1") struct A314_IOReque
 	return IOERR_NOCMD;
 }
 
-ULONG get_a314_membase(__reg("a6") struct MyDevice *dev)
+ULONG translate_address_a314(__reg("a6") struct MyDevice *dev, __reg("a0") void *address)
 {
-	return a314_membase;
+	if (mapping_type == MAPPING_512K_UPPER)
+	{
+		ULONG offset = (ULONG)address - mapping_base;
+		if (offset >= 512 * 1024)
+			return -1;
+		return offset + 0x80000;
+	}
+	else if (mapping_type == MAPPING_1M_CONTINUOUS)
+	{
+		ULONG offset = (ULONG)address - mapping_base;
+		if (offset >= 1024 * 1024)
+			return -1;
+		return offset;
+	}
+	else
+		return -1;
 }
 
 ULONG device_vectors[] =
@@ -1309,7 +1333,7 @@ ULONG device_vectors[] =
 	0,
 	(ULONG)begin_io,
 	(ULONG)abort_io,
-	(ULONG)get_a314_membase,
+	(ULONG)translate_address_a314,
 	-1,
 };
 
