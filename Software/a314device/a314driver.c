@@ -73,7 +73,7 @@ struct ExecBase *SysBase;
 
 
 #define MAPPING_512K_UPPER		1
-#define MAPPING_1M_CONTINUOUS	2
+#define MAPPING_1M_REVERSED		2
 
 short mapping_type = 0;
 ULONG mapping_base = 0;
@@ -116,7 +116,7 @@ BOOL fix_memory()
 		if (mh->mh_Attributes & MEMF_A314)
 		{
 			ULONG lower = (ULONG)(mh->mh_Lower) & ~(512*1024 - 1);
-			mapping_type = lower == 0x100000 ? MAPPING_1M_CONTINUOUS : MAPPING_512K_UPPER;
+			mapping_type = lower == 0x100000 ? MAPPING_1M_REVERSED : MAPPING_512K_UPPER;
 			mapping_base = lower;
 			Permit();
 			return TRUE;
@@ -209,7 +209,7 @@ BOOL fix_memory()
 
 	AddTail(memlist, (struct Node*)mh);
 
-	mapping_type = split_at == 0x100000 ? MAPPING_1M_CONTINUOUS : MAPPING_512K_UPPER;
+	mapping_type = split_at == 0x100000 ? MAPPING_1M_REVERSED : MAPPING_512K_UPPER;
 	mapping_base = split_at;
 
 	Permit();
@@ -1314,11 +1314,15 @@ ULONG translate_address_a314(__reg("a6") struct MyDevice *dev, __reg("a0") void 
 			return -1;
 		return offset + 0x80000;
 	}
-	else if (mapping_type == MAPPING_1M_CONTINUOUS)
+	else if (mapping_type == MAPPING_1M_REVERSED)
 	{
 		ULONG offset = (ULONG)address - mapping_base;
 		if (offset >= 1024 * 1024)
 			return -1;
+		if (offset < 512 * 1024)
+			offset += 512 * 1024;
+		else
+			offset -= 512 * 1024;
 		return offset;
 	}
 	else
